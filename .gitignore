@@ -1,0 +1,10 @@
+**/__pycache__/
+docs/mariadb/mariadb/
+.env
+venv
+.idea
+*.iml
+**/upload
+**/tempupload
+**/index
+**/embedding-model

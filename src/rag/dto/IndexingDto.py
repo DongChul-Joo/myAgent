@@ -11,6 +11,6 @@ class FileInfo:
     name: Optional[str] = Field(None, title="파일명", description="파일의 이름입니다 (확장자 제외).")
     extension: Optional[str] = Field(None, title="확장자", description="파일의 확장자를 나타냅니다.")
     
-class MultiVectorIndexingResponseDto(AuditDto):
+class ParentDocumentIndexingResponseDto(AuditDto):
     uuid: Optional[str] = Field(None, title="색인 아이디", description="UUID 형식의 색인 아이디를 나타냅니다.")
     fileInfoList = list[FileInfo]

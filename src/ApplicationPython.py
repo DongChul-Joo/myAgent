@@ -9,7 +9,7 @@ from .common.exception.ComExceptionHandler import *
 
 from .common import ComDatabase
 
-from .chat.controller import IndexingController
+from .rag.controller import IndexingController , ChatController
 
 # Uvicorn 로거 설정 덮어쓰기
 uvicorn_log_config = {
@@ -55,6 +55,7 @@ app.add_middleware(
 app.add_middleware(AopMiddleware)
 
 app.include_router(IndexingController.router , tags=["Indexing"])
+app.include_router(ChatController.router , tags=["Chat"])
 
 app.add_exception_handler(RequestValidationError, validationExceptionHandler)
 app.add_exception_handler(HTTPException, httpExceptionHandler)

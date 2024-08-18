@@ -10,28 +10,28 @@ from . import LangchainFileUtil
 
 class MyAgentOpenAI:
     llm : ChatOpenAI
-    def __init__(self, modelName : str, temperature : int):
-        self.llm = ChatOpenAI(model = modelName , temperature = temperature)
+    def __init__(self, modelName : str, temperature : int = 0 , maxTokens : int = 2048):
+        self.llm = ChatOpenAI(model = modelName , temperature = temperature , max_tokens = maxTokens)
     
     def getLLM(self):
         return self.llm
     
     @staticmethod    
-    def splitDocumentImageAndText(docs):
+    def splitDocumentImageAndText(documentList):
         """
         base64로 인코딩된 이미지와 텍스트 분리
         """
         base64ImageList = []
         textList = []
-        for doc in docs:
+        for document in documentList:
             # 문서가 Document 타입인 경우 page_content 추출
-            if isinstance(doc, Document):
-                doc = doc.page_content
-            if LangchainFileUtil.checkBase64Format(doc) and LangchainFileUtil.checkBase64FormatImage(doc):
-                doc = LangchainFileUtil.resizeBase64Image(doc, size=(1300, 600))
-                base64ImageList.append(doc)
+            if isinstance(document, Document):
+                document = document.page_content
+            if LangchainFileUtil.checkBase64Format(document) and LangchainFileUtil.checkBase64FormatImage(doc):
+                doc = LangchainFileUtil.resizeBase64Image(document, size=(1300, 600))
+                base64ImageList.append(document)
             else:
-                textList.append(doc)
+                textList.append(document)
         return {"base64ImageList": base64ImageList, "textList": textList}
 
     # 텍스트 요소의 요약 생성
@@ -108,12 +108,12 @@ class MyAgentOpenAI:
         """
         컨텍스트를 단일 문자열로 결합
         """
-        context = "\n".join(splitDocumentImageAndTextDict["context"]["texts"])
+        context = "\n".join(splitDocumentImageAndTextDict["context"]["textList"])
         contentList = []
 
         # 이미지가 있으면 메시지에 추가
-        if splitDocumentImageAndTextDict["context"]["images"]:
-            for image in splitDocumentImageAndTextDict["context"]["images"]:
+        if splitDocumentImageAndTextDict["context"]["base64ImageList"]:
+            for image in splitDocumentImageAndTextDict["context"]["base64ImageList"]:
                 image_message = {
                     "type": "image_url",
                     "image_url": {"url": f"data:image/jpeg;base64,{image}"},
@@ -153,3 +153,59 @@ class MyAgentOpenAI:
         )
 
         return chain
+    
+    def getParemtDocumentChain(self , retriever):
+        """
+        멀티모달 RAG 체인
+        """
+
+        # RAG 파이프라인
+        chain = (
+            {
+                "context": retriever | RunnableLambda(MyAgentOpenAI.organizeDocument),
+                "question": RunnablePassthrough(),
+            }
+            | RunnableLambda(MyAgentOpenAI.createRagPrompt)
+            | self.llm
+            | StrOutputParser()
+        )
+
+        return chain
+    
+    @staticmethod    
+    def organizeDocument(documentList):
+        documentContentsList = []
+        for document in documentList:
+            # 문서가 Document 타입인 경우 page_content 추출
+            if isinstance(document, Document):
+                document = document.page_content
+            
+            documentContentsList.append(document)
+        return {"documentContentsList" : documentContentsList}
+    
+    @staticmethod    
+    def createRagPrompt(contextDict):
+                
+        """
+        컨텍스트를 단일 문자열로 결합
+        """
+        context = "\n".join(contextDict["context"]["documentContentsList"])
+
+        # 분석을 위한 프롬프트 추가
+        analysisPrompt = {
+            "type": "text",
+            "text": (
+                "You are a senior financial developer.\n"
+                "You will receive retrieved text data.\n"
+                "Determine whether this information is appropriate for providing advice in response to the user's question.\n"
+                "If it is appropriate, provide the advice.\n"
+                "If it is not appropriate, provide advice without using the information.\n"
+                "Write your response in Korean.\n"
+                "Do not translate any content that is not in Korean.\n"
+                f"User-provided question: {contextDict['question']}\n\n"
+                "Text and / or tables:\n"
+                f"{context}"
+            ),
+        }
+
+        return [HumanMessage(content=[analysisPrompt])]

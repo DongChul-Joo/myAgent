@@ -1,34 +1,27 @@
 import os
 import shutil
 import uuid
-from langchain_community.vectorstores import Chroma
+import faiss
+from langchain_community.vectorstores import FAISS
 from langchain.retrievers import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
 from langchain.schema import Document
 from langchain_community.document_transformers import LongContextReorder
 from langchain.storage import LocalFileStore
 from langchain.retrievers.multi_vector import MultiVectorRetriever
+from langchain.retrievers import ParentDocumentRetriever
 
 
-CHROMA_SAVE_PATH = "/workspace/resource/index/chroma"
-CHROMA_TEMP_SAVE_PATH = "/workspace/resource/tempindex/chroma"
+FAISS_SAVE_PATH = "/workspace/resource/index/faiss"
+FAISS_TEMP_SAVE_PATH = "/workspace/resource/tempindex/faiss"  
 
 DOCSTORE_PATH = "/workspace/resource/tempindex/docstore"
 
 MULTI_VECTOR_ID_KEY = "doc_id"
 
-def getIndexSaveDir():
-    return CHROMA_SAVE_PATH
-
-def getIndexSaveTempDir():
-    return CHROMA_TEMP_SAVE_PATH
-
 def getDocStore():
-    return LocalFileStore(directory_path=DOCSTORE_PATH)
+    return LocalFileStore(DOCSTORE_PATH)
 
-def getVectorStore(indexId: str, embeddingModel):
-    indexPath = os.path.join(CHROMA_SAVE_PATH, indexId)
-    return Chroma(persist_directory=indexPath, embedding_function=embeddingModel)
 
 def getMultiVectorRetriever(indexId: str, embeddingModel):
     retriever = MultiVectorRetriever(
@@ -39,13 +32,34 @@ def getMultiVectorRetriever(indexId: str, embeddingModel):
     
     return retriever
 
-def mergeVectorStore(vectorStoreA, vectorStoreB):
-    documents_b = vectorStoreB.get_all_documents()
-    vectorStoreA.add_documents(documents_b)
-    # vectorStoreA는 자동으로 persist_directory에 저장됨
+def getParentDocumentRetriever(vectorstore , childSplitter):
+    retriever = ParentDocumentRetriever(
+        vectorstore=vectorstore,
+        docstore=getDocStore(),
+        child_splitter=childSplitter,
+    )
+    return retriever
+
+def loadVectorStore(indexId : str , embeddingModel):
+    indexPath = os.path.join(FAISS_SAVE_PATH ,indexId)
+    return FAISS.load_local(indexPath, embeddingModel , allow_dangerous_deserialization=True)
+
+def getVectorStore(embeddingModel):
+    return FAISS(
+    embedding_function=embeddingModel,
+    index=faiss.IndexFlatL2(len(embeddingModel.embed_query("dimension_size"))),
+    docstore=getDocStore(),
+    index_to_docstore_id={},
+)
+        
+def mergeVectorStore(vectorStoreA , vectorStoreB):
+    return vectorStoreA.merge_from(vectorStoreB)
+
+def saveVectorStore(indexId : str ,vectorStore):
+    vectorStore.save_local(os.path.join(FAISS_SAVE_PATH ,indexId))
 
 def deleteVectorStore(indexId: str):
-    operatePath = os.path.join(CHROMA_SAVE_PATH, indexId)
+    operatePath = os.path.join(FAISS_SAVE_PATH, indexId)
     
     try:
         if os.path.exists(operatePath):
@@ -79,17 +93,14 @@ def addSummariesMultiVectorDocument(retriever, childContentsList, parentContents
 Vector store 색인 파일 생성
 """
 def createIndexing(
-    embeddingModel, 
-    documentList: list[Document], 
-    indexId: str
-):
+    embeddingModel , 
+    documentList : list[Document], 
+    indexId : str
+    ):
     try:
-        vectorstore = Chroma.from_documents(
-            documents=documentList, 
-            embedding_function=embeddingModel, 
-            persist_directory=os.path.join(CHROMA_SAVE_PATH, indexId)
-        )
-        # 자동으로 persist_directory에 저장됨
+        vectorstore = FAISS.from_documents(documentList, embeddingModel)
+        indexPath = os.path.join(FAISS_SAVE_PATH ,indexId)
+        vectorstore.save_local(indexPath)
         return vectorstore
     except Exception as e:
         raise e
@@ -98,18 +109,15 @@ def createIndexing(
 Vector store 임시 색인 파일 생성
 """
 def createTempIndexing(
-    embeddingModel, 
-    documentList: list[Document], 
-    indexId: str
-):
+    embeddingModel , 
+    documentList : list[Document], 
+    indexId : str
+    ):
     try:
-        vectorstore = Chroma.from_documents(
-            documents=documentList, 
-            embedding_function=embeddingModel, 
-            persist_directory=os.path.join(CHROMA_TEMP_SAVE_PATH, indexId)
-        )
-        # 자동으로 persist_directory에 저장됨
-        return vectorstore
+        vectorstore = FAISS.from_documents(documentList, embeddingModel)
+        indexPath = os.path.join(FAISS_TEMP_SAVE_PATH ,indexId)
+        vectorstore.save_local(indexPath)
+        return indexPath
     except Exception as e:
         raise e
 

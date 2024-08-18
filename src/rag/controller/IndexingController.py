@@ -9,8 +9,8 @@ from ..dto.IndexingDto import *
 #권한체크 , scheme='Bearer' credentials='token' 형식 반환됨
 router = APIRouter(prefix = "/api/indexing")
 
-@router.post("-mv" , response_model=MultiVectorIndexingResponseDto , summary="멀티벡터 색인 등록", description="This endpoint create multi vector index", operation_id="postMultiVectorIndexing")
-async def postMultiVectorIndexing(fileList: list[UploadFile] = File(...)):
-    response = await IndexingService.postMultiVectorIndexing(fileList)
+@router.post("-pd" , response_model=ParentDocumentIndexingResponseDto , summary="부모문서 색인 등록", description="This endpoint create parent document index", operation_id="postParentDocumentIndexing")
+async def postParentDocumentIndexing(fileList: list[UploadFile] = File(...)):
+    response = await IndexingService.postParentDocumentIndexing(fileList)
     return JSONResponse(content=response.dict() , status_code=status.HTTP_200_OK)
   

@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 from fastapi import File, UploadFile
 from langchain.schema import Document
 from langchain_community.document_loaders import TextLoader,UnstructuredWordDocumentLoader,UnstructuredPowerPointLoader,UnstructuredEPubLoader
-from unstructured.partition.pdf import partition_pdf
+#from unstructured.partition.pdf import partition_pdf
 
 WORKDIR_PATH = os.getcwd()
 
@@ -124,6 +124,15 @@ def deleteToTemp(fileId: str):
 # 함수 호출
 def readTempFileByLoader(fileId: str , fileName :str , loader : str ):
     filePath = os.path.join(os.path.join(FILE_TEMP_UPLOAD_PATH,fileId) , fileName)
+    func = globals().get(loader)
+    if func and callable(func):
+        return func(filePath)
+    else:
+        raise ValueError(f"Loader {loader} is not defined")
+
+# 함수 호출
+def readFileByLoader(fileId: str , fileName :str , loader : str ):
+    filePath = os.path.join(os.path.join(FILE_UPLOAD_PATH,fileId) , fileName)
     func = globals().get(loader)
     if func and callable(func):
         return func(filePath)
@@ -393,39 +402,42 @@ def resizeBase64Image(base64String : str, size=(128, 128)):
     # 조정된 이미지를 Base64로 인코딩
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
+"""
+파싱에 너무 오랜 시간 소요되어 사용 제외
 def readMultiModalPDFLoader(fileId: str , fileName :str , maxPartitionSize : int , newPartitionSize : int , combinePartitionSize : int):
-    """
-    PDF 파일에서 이미지, 테이블, 그리고 텍스트 조각을 추출합니다.
-    path: 이미지(.jpg)를 저장할 파일 경로
-    fname: 파일 이름
-    """
-    fileDirPath = os.path.join(FILE_UPLOAD_PATH, fileId)
-    fileImageDirPath = os.path.join(FILE_UPLOAD_CONTENTS_IMAGE_PATH, fileId)
-    print("partition start")
-    pdfPartition = partition_pdf(
-        filename=os.path.join(fileDirPath,fileName),
-        extract_images_in_pdf = True,  # PDF 내 이미지 추출 활성화
-        infer_table_structure = True,  # 테이블 구조 추론 활성화
-        chunking_strategy = "by_title",  # 제목별로 텍스트 조각화
-        max_characters = maxPartitionSize,  # 최대 문자 수
-        new_after_n_chars = newPartitionSize,  # 이 문자 수 이후에 새로운 조각 생성
-        combine_text_under_n_chars = combinePartitionSize,  # 이 문자 수 이하의 텍스트는 결합
-        image_output_dir_path=fileImageDirPath,  # 이미지 출력 디렉토리 경로
-    )
-    print("partition end")
-    """
-    PDF에서 추출된 요소를 테이블과 텍스트로 분류합니다.
-    raw_pdf_elements: unstructured.documents.elements의 리스트
-    """
-    tableList = []  # 테이블 저장 리스트
-    textList = []  # 텍스트 저장 리스트
-    for partition in pdfPartition:
-        if "unstructured.documents.elements.Table" in str(type(partition)):
-            tableList.append(str(partition))  # 테이블 요소 추가
-        elif "unstructured.documents.elements.CompositeElement" in str(type(partition)):
-            textList.append(str(partition))  # 텍스트 요소 추가
-    
-    return textList, tableList
+
+PDF 파일에서 이미지, 테이블, 그리고 텍스트 조각을 추출합니다.
+path: 이미지(.jpg)를 저장할 파일 경로
+fname: 파일 이름
+
+fileDirPath = os.path.join(FILE_UPLOAD_PATH, fileId)
+fileImageDirPath = os.path.join(FILE_UPLOAD_CONTENTS_IMAGE_PATH, fileId)
+print("partition start")
+pdfPartition = partition_pdf(
+    filename=os.path.join(fileDirPath,fileName),
+    extract_images_in_pdf = True,  # PDF 내 이미지 추출 활성화
+    infer_table_structure = True,  # 테이블 구조 추론 활성화
+    chunking_strategy = "by_title",  # 제목별로 텍스트 조각화
+    max_characters = maxPartitionSize,  # 최대 문자 수
+    new_after_n_chars = newPartitionSize,  # 이 문자 수 이후에 새로운 조각 생성
+    combine_text_under_n_chars = combinePartitionSize,  # 이 문자 수 이하의 텍스트는 결합
+    image_output_dir_path=fileImageDirPath,  # 이미지 출력 디렉토리 경로
+)
+print("partition end")
+
+PDF에서 추출된 요소를 테이블과 텍스트로 분류합니다.
+raw_pdf_elements: unstructured.documents.elements의 리스트
+
+tableList = []  # 테이블 저장 리스트
+textList = []  # 텍스트 저장 리스트
+for partition in pdfPartition:
+    if "unstructured.documents.elements.Table" in str(type(partition)):
+        tableList.append(str(partition))  # 테이블 요소 추가
+    elif "unstructured.documents.elements.CompositeElement" in str(type(partition)):
+        textList.append(str(partition))  # 텍스트 요소 추가
+
+return textList, tableList
+"""
 
 def getDirImageListToBase64(dirPath : str):
     imageBase64List = []

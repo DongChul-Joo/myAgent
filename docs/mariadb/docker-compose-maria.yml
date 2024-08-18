@@ -1,0 +1,19 @@
+version: "3"
+
+services:
+  my_agent.maria:
+    image: mariadb:10.8.3
+    container_name: my_agent.maria
+    restart: always
+    ports:
+      - 35306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: root@pwd
+      LC_ALL: "C.UTF-8"
+      TZ: "Asia/Seoul"
+    volumes:
+      - ./mariadb:/var/lib/mysql
+      - ./01-common.sql:/docker-entrypoint-initdb.d/01-common.sql:ro
+    logging:
+      options:
+        max-size: "100k"
